@@ -1,0 +1,119 @@
+const mongoose = require('mongoose');
+const shortid = require('shortid');
+const moment = require('moment');
+
+const { Schema, model } = mongoose;
+
+const couponSchema = new Schema(
+  {
+    organisation: {
+      type: Schema.Types.ObjectId,
+      ref: 'organisations',
+    },
+    organisationAccount: {
+      type: Schema.Types.ObjectId,
+      ref: 'accounts',
+    },
+    intern: {
+      type: Schema.Types.ObjectId,
+      ref: 'users',
+    },
+    name: {
+      type: String,
+      lowercase: true,
+      trim: true,
+    },
+    email: {
+      type: String,
+      lowercase: true,
+      trim: true,
+    },
+    message: {
+      type: String,
+    },
+    // organisation's admin
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'users',
+    },
+    // 50% => 50
+    discountRate: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 100,
+    },
+    code: {
+      type: String,
+      unique: true,
+      required: true,
+      default: shortid.generate,
+    },
+    startDate: {
+      type: Date,
+      required: true,
+      // validate: {
+      //   validator: value =>
+      //     moment().startOf('day') <= value ||
+      //     process.env.NODE_ENV !== 'production',
+      //   message: 'start date is in the past',
+      // },
+    },
+    endDate: {
+      type: Date,
+      required: true,
+      // validate: {
+      //   validator: value =>
+      //     moment().startOf('day') <= value ||
+      //     process.env.NODE_ENV !== 'production',
+      //   message: 'end date is in the past',
+      // },
+    },
+    // the amount of money been deducted from org account
+    reservedAmount: {
+      type: Number,
+      min: 0,
+      required: true,
+    },
+    // the amount of money been used by intern so far
+    usedAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+      required: true,
+      validate: {
+        validator(usedAmount) {
+          return usedAmount <= this.reservedAmount;
+        },
+        message: 'used amount exceeded the reserved amount',
+      },
+    },
+    // coupon's transactions history
+    transactions: [
+      {
+        _id: { type: Schema.ObjectId, auto: true },
+        // the amount been paid in this transaction
+        amount: {
+          type: Number,
+          min: 0,
+          required: true,
+        },
+        booking: {
+          type: Schema.Types.ObjectId,
+          ref: 'bookings',
+        },
+        transaction: {
+          type: Schema.Types.ObjectId,
+          ref: 'internalTransactions',
+        },
+      },
+    ],
+  },
+  {
+    timestamps: true,
+  },
+);
+
+const Coupon = model('coupons', couponSchema);
+
+module.exports = Coupon;

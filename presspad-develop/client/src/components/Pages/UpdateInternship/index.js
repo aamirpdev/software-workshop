@@ -1,0 +1,227 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import moment from 'moment';
+
+import { useLocation, useHistory } from 'react-router-dom';
+
+import { disabledStartDate, disabledEndDate } from '../../../helpers';
+import { updateInternshipAndCreateBooking } from './utils';
+import {
+  API_INTERNSHIP_URL,
+  API_GET_INTERN_BURSARY_APPLICATION,
+} from '../../../constants/apiRoutes';
+import { DASHBOARD_URL } from '../../../constants/navRoutes';
+import { TABLET_WIDTH } from '../../../constants/screenWidths';
+import Form from './Form';
+import ScrollToTop from '../../Common/ScrollToTop';
+
+const { validate, internshipSchema } = require('../../../validation');
+
+const fields = {
+  organisation: '',
+  internshipContact: {
+    name: '',
+    email: '',
+    phoneNumber: '',
+  },
+  internshipOfficeAddress: {
+    addressline1: '',
+    addressline2: '',
+    city: '',
+    postcode: '',
+  },
+  internshipStartDate: null,
+  internshipEndDate: null,
+  offerLetter: {
+    fileName: '',
+    isPrivate: true,
+    url: '',
+  },
+  bursary: {},
+};
+
+const useQuery = () => new URLSearchParams(useLocation().search);
+
+const UpdateInternship = ({ id, windowWidth }) => {
+  const [loading, setLoading] = useState(false);
+  const [state, setState] = useState({ ...fields });
+  const [errors, setErrors] = useState({ ...fields, offerLetter: '' });
+  const query = useQuery();
+  const history = useHistory();
+
+  const startDate = query.get('startDate');
+  const endDate = query.get('endDate');
+
+  const bookingData = {
+    startDate:
+      startDate &&
+      moment(startDate) &&
+      moment(startDate).isValid() &&
+      moment(startDate).toISOString(),
+    endDate:
+      endDate &&
+      moment(endDate) &&
+      moment(endDate).isValid() &&
+      moment(endDate).toISOString(),
+    host: query.get('hostId'),
+    price: query.get('price'),
+    listing: query.get('listing'),
+    couponInvalidStart: query.get('couponInvalidStart'),
+    couponInvalidEnd: query.get('couponInvalidEnd'),
+  };
+
+  const onInputChange = e => {
+    const { value, name, dataset: { parent } = {} } = e.target;
+    if (parent) {
+      setErrors(_errors => ({
+        ..._errors,
+        [parent]: { ..._errors[parent], [name]: '' },
+      }));
+
+      return setState(_state => ({
+        ..._state,
+        [parent]: { ..._state[parent], [name]: value },
+      }));
+    }
+
+    setErrors(_errors => ({ ..._errors, [name]: '' }));
+    return setState(_state => ({ ..._state, [name]: value }));
+  };
+
+  const onUploadInternshipOffer = offerLetter => {
+    setState(_state => ({ ..._state, offerLetter }));
+  };
+
+  const onStartChange = value => {
+    setState(_state => ({
+      ..._state,
+      internshipStartDate: value && value.toISOString(),
+    }));
+    setErrors(_errors => ({ ..._errors, internshipStartDate: '' }));
+  };
+  const onEndChange = value => {
+    setState(_state => ({
+      ..._state,
+      internshipEndDate: value && value.toISOString(),
+    }));
+    setErrors(_errors => ({ ..._errors, internshipEndDate: '' }));
+  };
+  const _disabledStartDate = _startDate => {
+    const { internshipEndDate } = state;
+    return disabledStartDate({
+      endDate: internshipEndDate,
+      startDate: _startDate,
+    });
+  };
+
+  const _disabledEndDate = _endDate => {
+    const { internshipStartDate } = state;
+    return disabledEndDate({
+      endDate: _endDate,
+      startDate: internshipStartDate,
+    });
+  };
+
+  const fetchInternshipDetails = async () => {
+    const { data } = await axios.get(API_INTERNSHIP_URL);
+    setState(_state => ({ ..._state, ...data }));
+  };
+
+  const getInternApprovedBursaryApplication = async () => {
+    try {
+      const { data: bursary } = await axios.get(
+        API_GET_INTERN_BURSARY_APPLICATION,
+      );
+      if (bursary && bursary.length) {
+        setState(_state => ({ ..._state, bursary: bursary[0] }));
+      }
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  useEffect(() => {
+    fetchInternshipDetails(id);
+    return () => {};
+  }, [id]);
+
+  useEffect(() => {
+    getInternApprovedBursaryApplication();
+    return () => {};
+  }, []);
+
+  const onSubmit = async e => {
+    e.preventDefault();
+    let _offerLetter = state.offerLetter;
+
+    const { errors: _errors } = await validate({
+      schema: internshipSchema,
+      data: state,
+    });
+
+    if (!_errors) {
+      setLoading(true);
+      if (_offerLetter && _offerLetter.new && !_offerLetter.uploaded) {
+        const generatedName = `${id}/${Date.now()}.${_offerLetter.name}`;
+        const {
+          data: { signedUrl },
+        } = await axios.get(`/api/upload/signed-url?fileName=${generatedName}`);
+        const headers = {
+          'Content-Type': 'application/octet-stream',
+        };
+
+        await axios.put(signedUrl, _offerLetter, {
+          headers,
+        });
+
+        _offerLetter = {
+          fileName: generatedName,
+          new: true,
+          uploaded: true,
+          preview: _offerLetter.preview,
+        };
+      }
+
+      const { error } = await updateInternshipAndCreateBooking({
+        ...state,
+        ...bookingData,
+        offerLetter: _offerLetter,
+      });
+
+      if (!error) {
+        history.push(DASHBOARD_URL);
+      }
+    } else {
+      setErrors(oldErrors => ({ ...oldErrors, ..._errors }));
+    }
+    setLoading(false);
+  };
+
+  const fileErrorHandler = ({ errorMsg }) => {
+    setErrors(oldErrors => ({ ...oldErrors, offerLetter: errorMsg }));
+  };
+
+  return (
+    <>
+      <ScrollToTop />
+      <Form
+        isMobile={windowWidth < TABLET_WIDTH}
+        bookingData={bookingData}
+        state={state}
+        errors={errors}
+        loading={loading}
+        userId={id}
+        onInputChange={onInputChange}
+        disabledStartDate={_disabledStartDate}
+        onStartChange={onStartChange}
+        disabledEndDate={_disabledEndDate}
+        onEndChange={onEndChange}
+        onUploadInternshipOffer={onUploadInternshipOffer}
+        fileErrorHandler={fileErrorHandler}
+        onSubmit={onSubmit}
+      />
+    </>
+  );
+};
+
+export default UpdateInternship;

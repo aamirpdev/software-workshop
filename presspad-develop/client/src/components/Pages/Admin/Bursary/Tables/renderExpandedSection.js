@@ -1,0 +1,55 @@
+import React from 'react';
+
+import * as T from '../../../../Common/Typography';
+import { Row, Col } from '../../../../Common/Grid';
+
+import { ADMIN_SINGLE_INTERNS_URL } from '../../../../../constants/navRoutes';
+
+import { formatPrice } from '../../../../../helpers';
+
+const renderExpandedSection = rowData => {
+  const {
+    intern: { email },
+    rejectedBursaries,
+    awardedBursariesCost,
+    name,
+    id,
+  } = rowData;
+  return (
+    <>
+      <Row mb={2}>
+        <Col w={[4, 4, 4]}>
+          <T.PXSBold color="darkGray">Email address</T.PXSBold>
+          <T.Link light color="lightBlue" isExternal to={`mailto:${email}`}>
+            {email}
+          </T.Link>
+        </Col>
+        <Col w={[4, 4, 4]}>
+          <T.PXSBold color="darkGray">
+            Bursaries they&apos;ve been given
+          </T.PXSBold>
+          <T.PXS color="lightBlue">{formatPrice(awardedBursariesCost)}</T.PXS>
+        </Col>
+        <Col w={[4, 4, 4]}>
+          <T.PXSBold color="darkGray">Link to their profile</T.PXSBold>
+          <T.Link
+            color="lightBlue"
+            light
+            newTab
+            to={ADMIN_SINGLE_INTERNS_URL.replace(':id', id)}
+          >
+            {name}
+          </T.Link>
+        </Col>
+      </Row>
+      <Row>
+        <Col w={[4, 4, 4]}>
+          <T.PXSBold color="darkGray">Rejected bursaries</T.PXSBold>
+          <T.PXS color="lightBlue">{rejectedBursaries}</T.PXS>
+        </Col>
+      </Row>
+    </>
+  );
+};
+
+export default renderExpandedSection;

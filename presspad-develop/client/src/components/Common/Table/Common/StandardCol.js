@@ -1,0 +1,98 @@
+import React from 'react';
+import moment from 'moment';
+import * as T from '../../Typography';
+import camelToWords from '../../../../helpers/camelToWords';
+import { formatPrice, createSingleDate } from '../../../../helpers';
+import Icon from '../../Icon';
+
+const formatText = (text, type) => {
+  switch (type) {
+    case 'date':
+      return createSingleDate(text);
+    case 'price':
+      return `£${formatPrice(text)}`;
+    case 'perc':
+      return `${text}%`;
+    default:
+      return text;
+  }
+};
+
+const decideSort = (a, b, colTitle, type) => {
+  switch (type) {
+    case 'date':
+      return (
+        a[colTitle] ||
+        moment('01/01/1980') - b[colTitle] ||
+        moment('01/01/1980')
+      );
+    case 'price':
+      return a[colTitle] || 0 - b[colTitle] || 0;
+    case 'number':
+      return a[colTitle] || 0 - b[colTitle] || 0;
+    case 'perc':
+      return a[colTitle] || 0 - b[colTitle] || 0;
+    default:
+      return a[colTitle].localeCompare(b[colTitle]);
+  }
+};
+
+const decideIcon = text => {
+  switch (text) {
+    case 'successful':
+      return (
+        <Icon
+          icon="circleTick"
+          width="20px"
+          height="20px"
+          color="lightBlue"
+          margin="0 5px 0 0"
+        />
+      );
+    case 'unsuccessful':
+      return (
+        <Icon
+          icon="crossCircle"
+          width="20px"
+          height="20px"
+          color="pink"
+          margin="0 5px 0 0"
+        />
+      );
+    default:
+      return null;
+  }
+};
+
+const StandardCol = (colTitle, type, customSort, subtitle, subtitleType) => ({
+  title: camelToWords(colTitle),
+  dataIndex: colTitle,
+  key: colTitle,
+  sorter: (a, b) => customSort || decideSort(a, b, colTitle, type),
+  className: 'standardCol',
+  render: (text, rowData) => {
+    const textIsEmail = typeof text === 'string' && text.includes('@');
+    return (
+      <>
+        <div style={{ display: 'flex' }}>
+          {decideIcon(text)}
+          <T.PXS
+            color="black"
+            style={{
+              textTransform: text && !textIsEmail && 'capitalize',
+            }}
+          >
+            {text || text === 0 ? formatText(text, type) : 'N/A'}
+          </T.PXS>
+        </div>
+        {subtitle && (
+          <T.PXS color="lightGray" style={{ textTransform: 'capitalize' }}>
+            {text ? formatText(rowData[subtitle], subtitleType) : 'N/A'}
+          </T.PXS>
+        )}
+      </>
+    );
+  },
+});
+
+export default StandardCol;
